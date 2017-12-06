@@ -1,0 +1,59 @@
+- hosts: all
+
+  remote_user: centos
+
+  tasks:
+    - name: enable selinux
+      command: /sbin/setenforce 1
+      become: true
+    - name: update nginx
+      yum: name=nginx state=latest
+      become: true
+    - name: enable nginx
+      systemd: name=nginx enabled=yes state=started
+      become: true
+
+
+- hosts: load_balancer
+
+  remote_user: centos
+
+  tasks:
+    - name: write config
+      template:
+        src: ./templates/nginx_load_balancer.conf.j2
+        dest: /etc/nginx/nginx.conf
+      become: true
+    - name: reload nginx
+      command: nginx -s reload
+      become: true
+    - name: selinux httpd connect
+      command: setsebool httpd_can_network_connect on
+      become: true
+
+- hosts: compute
+
+  remote_user: centos
+
+  tasks:
+    - name: write config
+      copy:
+        src: ./templates/nginx_compute.conf
+        dest: /etc/nginx/nginx.conf
+      become: true
+    - name: reload nginx
+      command: nginx -s reload
+      become: true
+    - file:
+        path: /opt/http
+        owner: nobody
+        group: centos
+      become: true
+      
+    - name: write served content
+      template:
+        src: ./templates/index.html.j2
+        dest: /opt/http/index.html
+        owner: nobody
+        group: centos
+      become: true
